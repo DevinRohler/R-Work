@@ -1,0 +1,430 @@
+---
+title: "STAT 515 Final"
+author: "Devin Rohler"
+date: "10/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#package
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+library(corrplot)
+library(car)
+library(GGally)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(DMwR2)
+library(ggcorrplot)
+library(RColorBrewer)
+library(useful)
+```
+
+
+1. "How do certain variables effect death?  Do some variables have a higher effect on death as an outcome than others?"
+
+2. "Can a model be created to predict whether a patient will die or not based on the avaliable variables?"
+
+```{r}
+#Read in
+heart <- read.table(file.choose(), sep = ",", header = TRUE)
+```
+```{r}
+#source file for aesthetics 
+source(file = "C:/Users/Devin/Desktop/School Work/Graduate/Fall 2021/STAT 515/Final/hw.r")
+```
+```{r}
+#tidy
+heart <- rename(heart, creatinine_ph = creatinine_phosphokinase, creatinine_se = serum_creatinine, death = DEATH_EVENT)
+```
+```{r}
+#Recode
+heart$sex = factor(heart$sex,
+                   levels = c(0,1),
+                   labels = c("Female","Male"))
+heart$death = factor(heart$death,
+                     levels = c(0,1),
+                     labels = c('Alive','Dead'))
+heart$anaemia = factor(heart$anaemia,
+                     levels = c(0,1),
+                     labels = c('False','True'))
+heart$high_blood_pressure = factor(heart$high_blood_pressure,
+                     levels = c(0,1),
+                     labels = c('False','True'))
+heart$diabetes = factor(heart$diabetes,
+                     levels = c(0,1),
+                     labels = c('False','True'))
+heart$smoking = factor(heart$smoking,
+                     levels = c(0,1),
+                     labels = c('False','True'))
+```
+
+
+Dataset Preview and Stats
+```{r}
+heart %>% group_by(sex, death) %>% 
+  summarise(n_patients = n(),
+             min_age = min(age),
+             avg_age = mean(age),
+             max_age = max(age)) %>% 
+    mutate(freq = n_patients / sum(n_patients))
+
+
+#From this grouped dataframe we can get a better look into the dataset. This shows how many men and women make up the data set and alittle about thier ages
+#The data includes a total of 299 patients, 105(women) and 194(male)
+#Out of those 105 women, 34 died and out of the 194 men 62 died
+```
+```{r, fig.width=11, fig.height=8}
+#Visulization #1
+ggplot(data = heart,aes(x = age, y = count)) +
+  geom_histogram(aes(y = ..count.., fill = sex), color = 'white', bins = 20) +
+  facet_wrap(~ sex + death, nrow = 2, scales = 'free')  +
+  labs(title = "Patient Death Status by Age and Gender",
+       x = "Age",
+       y = "Amount of Patients") +
+  theme(legend.position = 'none') 
+```
+
+
+
+
+Exploratory Analysis Among Boolean Predictors
+```{r}
+#Death among those patients who are smokers
+heart %>% group_by(death,smoking) %>% 
+  summarise(n_patients = n(),
+            avg_age = mean(age)) %>% 
+  mutate(freq = n_patients / sum(n_patients))
+
+#From this grouped dataframe we can see how smoking has affected deaths among patients
+#Among the 299 patient, 96 were identified as smokers (32%)
+#Among the 96 smokers, 30 died (31%)
+```
+```{r}
+#Death among those patients with anaemia
+heart %>% group_by(death,anaemia) %>% 
+  summarise(n_patients = n(),
+            avg_age = mean(age)) %>% 
+  mutate(freq = n_patients / sum(n_patients))
+
+#From this grouped dataframe we can see how anameia has affected deaths among patients
+#Among the 299 patients, 129 were identified as having anaemia (43%)
+#Among the 129 patients with anaemia, 46 died (35%)
+```
+```{r}
+#Death among those patients with diabetes
+heart %>% group_by(death,diabetes) %>% 
+  summarise(n_patients = n(),
+            avg_age = mean(age)) %>% 
+  mutate(freq = n_patients / sum(n_patients))
+
+#From this grouped dataframe we can see how diabetes has affected deaths among patients
+#Among the 299 patients, 125 were identified as having diabetes (41%)
+#Among the 125 patients with diabetes, 40 died (32%)
+```
+```{r}
+#Death among those patients with high_blood_pressure
+heart %>% group_by(death,high_blood_pressure) %>% 
+  summarise(n_patients = n(),
+            avg_age = mean(age)) %>% 
+  mutate(freq = n_patients / sum(n_patients))
+
+#From this grouped dataframe we can see how diabetes has affected deaths among patients
+#Among the 299 patients, 105 were identified as having high blood pressure (35%)
+#Among the 105 patients with high blood pressure, 39 died (37%)
+```
+```{r, fig.height= 6, fig.width=11 fig.cap = "Red = Male and Blue = Female}
+#Visulization for 4 Boolean predictors
+bool1 <- ggplot(data = heart,aes(x = smoking, y = count)) +
+  geom_bar(aes(y = ..count.., fill = death), color = 'white', bins = 20, position = 'dodge') + 
+  theme(legend.position = 'none') +
+  labs(x = 'Smoking', y = '')
+
+bool2 <- ggplot(data = heart,aes(x = anaemia, y = count)) +
+  geom_bar(aes(y = ..count.., fill = death), color = 'white', bins = 20, position = 'dodge') + 
+  theme(legend.position = 'none') +
+    labs(x = 'Anaemia', y = '')
+
+bool3 <- ggplot(data = heart,aes(x = diabetes, y = count)) +
+  geom_bar(aes(y = ..count.., fill = death), color = 'white', bins = 20, position = 'dodge') + 
+  theme(legend.position = 'none') +
+    labs(x = 'Diabetes', y = '')
+
+bool4 <- ggplot(data = heart,aes(x = high_blood_pressure, y = count)) +
+  geom_bar(aes(y = ..count.., fill = death), color = 'white', bins = 20, position = 'dodge') + 
+  theme(legend.position = 'none') +
+    labs(x = 'High Blood Pressure', y = '')
+grid.arrange(bool1,bool2,bool3,bool4,nrow = 2, top = "Count of Death for 4 Variables, Grouped by Gender")
+```
+
+
+
+Exploratory Analysis Among Numerical Predictors
+```{r}
+#Creatinine Phosphokinase (CPK), level of CPK in blood, Measured in Miligrams per litre (mcg/L)
+heart %>% group_by(death) %>% 
+  summarise(n_patients = n(),
+             min_creatinine_ph = min(creatinine_ph),
+             avg_creatinine_ph = mean(creatinine_ph),
+             max_creatinine_ph = max(creatinine_ph),
+             st_dev = sd(creatinine_ph))
+
+#This grouped data frame gives more insight into levels of CPK in patients
+#CPK on average was 130.1434 mcg/L higher for those who died
+#CPK standard deviation is higher for those who dies as well
+```
+```{r}
+#Ejection Fraction, percent of blood leaving the heart at each contraction, percentage 
+heart %>% group_by(death) %>% 
+  summarise(n_patients = n(),
+             min_ejection = min(ejection_fraction),
+             avg_ejection = mean(ejection_fraction),
+             max_ejection = max(ejection_fraction),
+             st_dev = sd(ejection_fraction))
+
+#This grouped data frame gives more insight into ejection fraction among patients 
+#Ejection Fraction on average was 6.79% lower for those who died
+#Max ejection was 10% lower for those who died
+```
+```{r}
+#Platelets, platelets in blood, measured in kiloplatelets per milolitre (k/ml)
+heart %>% group_by(death) %>% 
+  summarise(n_patients = n(),
+             min_plate = min(platelets),
+             avg_plate = mean(platelets),
+             max_plate = max(platelets),
+             st_dev = sd(platelets))
+
+#This grouped data frame gives more insight into platelets among patients 
+#Platelets on average were 10,276 k/ml higher for those who did not die
+```
+```{r}
+#Serum Creatinine, level of of serum creatinine in blood, measured in miligrams per decilitre (mg/dl)
+heart %>% group_by(death) %>% 
+  summarise(n_patients = n(),
+             min_sc = min(creatinine_se),
+             avg_sc = mean(creatinine_se),
+             max_sc = max(creatinine_se),
+             st_dev = sd(creatinine_se))
+
+#This grouped data frame gives more insight into Serum Creatinine in patients 
+#Serum Creatinine on average was 0.65 mg/dl higher for those who died
+```
+```{r}
+#Serum Sodiun, level of Serum Sodium in the blood, measured in milliequivalents per litre (mEq/L)
+heart %>% group_by(death) %>% 
+  summarise(n_patients = n(),
+             min_ss = min(serum_sodium),
+             avg_ss = mean(serum_sodium),
+             max_ss = max(serum_sodium),
+             st_ss = sd(serum_sodium))
+
+#This grouped data frame gives more insight into Serum Sodium in patients 
+#Serum Sodium on average was 1.84 mEq/L higher for those who did not die
+```
+```{r}
+#correlation between numerical predictors
+vars <- select(model_df,death,creatinine_se,ejection_fraction,platelets,creatinine_ph,serum_sodium)
+corrplot(cor(vars),type = 'upper', method = 'color', diag = FALSE,
+         tl.srt = 45, addCoef.col = 'black',
+         main = 'Correlation Between Numerial Predictors and Death')
+```
+```{r}
+#correlation between all variables
+model.matrix(~death+., data = model_df) %>% cor(use = 'pairwise.complete.obs') %>%
+  ggcorrplot(show.diag = F, type = 'lower', lab = TRUE, lab_size = 2, title = 'Correlation Between Each variable and Death')
+```
+
+
+
+Change dataframe factors for model
+```{r}
+#read in dataset again, factors were changed for visulization in exploratory analysis
+model_df <- read.table(file.choose(), sep = ",", header = TRUE)
+model_df <- rename(model_df, creatinine_ph = creatinine_phosphokinase, creatinine_se = serum_creatinine, death = DEATH_EVENT)
+```
+```{r}
+#factor for model 
+model_df$death <- factor(model_df$death)
+model_df$anaemia <- factor(model_df$anaemia)
+model_df$diabetes <- factor(model_df$diabetes)
+model_df$high_blood_pressure <- factor(model_df$high_blood_pressure)
+model_df$sex <- factor(model_df$sex)
+model_df$smoking <- factor(model_df$smoking)
+str(model_df)
+```
+
+
+
+
+#research questions and models 
+
+1. "How do certain variables effect death?  Do some variables have a higher effect on death as an outcome than others?"
+
+2. "Can a model be created to predict whether a patient will die or not based on the avaliable variables?"
+
+
+
+
+Model #1, Analysis and Visulization
+
+model 1 will attempt predict whether a paitent will die or not. This will be done with a logistic model. The response variable will be death. 
+
+
+#logistic
+```{r}
+#split
+set.seed(202)
+logistic_train = sample(2,nrow(model_df), replace = T, prob = c(0.5,0.5))
+train <- model_df[logistic_train == 1,]
+test <- model_df[logistic_train == 2,]
+#model 
+glm_model <- glm(death ~ time + smoking + anaemia + diabetes + high_blood_pressure + sex + platelets + creatinine_ph + creatinine_se + ejection_fraction + serum_sodium + age, data = train, family = 'binomial')
+summary(glm_model)
+```
+```{r}
+#train prediction 
+train_predict <- predict(glm_model,train, type = 'response')
+print(train_predict)
+print(head(train))
+```
+```{r}
+#table and error
+table <- ifelse(train_predict > 0.5,1,0)
+log_table <- table(table,train$death)
+print(log_table)
+1 - sum(diag(log_table))/sum(log_table)
+```
+```{r}
+#test prediction
+test_predict <- predict(glm_model, test, type = 'response')
+table2 <- ifelse(test_predict > 0.5,1,0)
+log_table_2 <- table(table2,test$death)
+print(log_table_2)
+1 - sum(diag(log_table_2))/sum(log_table_2)
+```
+```{r}
+#test model of significance 
+with(glm_model, pchisq(null.deviance - deviance, df.null-df.residual, lower.tail = FALSE))
+```
+
+```{r}
+glm()
+```
+
+#model 1 reran, with dropping p-values greater than .10
+```{r}
+#split
+set.seed(203)
+logistic_train2 = sample(2,nrow(model_df), replace = T, prob = c(0.5,0.5))
+train2 <- model_df[logistic_train2 == 1,]
+test2 <- model_df[logistic_train2 == 2,]
+#model 
+glm_model2 <- glm(death ~ time + creatinine_se + ejection_fraction + age, data = train2, family = 'binomial')
+summary(glm_model2)
+```
+```{r}
+#train prediction 
+train_predict2 <- predict(glm_model2,train2, type = 'response')
+print(train_predict2)
+print(head(train2))
+```
+```{r}
+#table and error
+table2 <- ifelse(train_predict2 > 0.5,1,0)
+log_table2 <- table(table2,train2$death)
+print(log_table2)
+1 - sum(diag(log_table2))/sum(log_table2)
+```
+```{r}
+#test prediction
+test_predict2 <- predict(glm_model2, test2, type = 'response')
+table3 <- ifelse(test_predict2 > 0.5,1,0)
+log_table_3 <- table(table3,test2$death)
+print(log_table_3)
+1 - sum(diag(log_table_3))/sum(log_table_3)
+```
+```{r}
+#test model of significance 
+with(glm_model, pchisq(null.deviance - deviance, df.null-df.residual, lower.tail = FALSE))
+```
+
+
+
+
+
+
+
+
+Model #2, Analysis and Visulization
+ 
+To awnser this question, a classification tree will executed and analyzed. Time will be dropped from model, time is not useful for the model. Time variable is represented as the last time the patient had a check up, if they are dead they did not have one. Time would have a much higher effect for taying alive. for this we are trying to find the effects on death. 
+
+```{r}
+#fitting classification tree, small cp before trim
+set.seed(2)
+rpart.model_df = rpart(death ~ time + age + anaemia + creatinine_ph + diabetes + ejection_fraction + high_blood_pressure + platelets + creatinine_se + serum_sodium + sex + smoking,
+                       data = heart,
+                       cp = 0.00000000001)
+```
+```{r}
+#model results
+plotcp(rpart.model_df)
+printcp(rpart.model_df)
+```
+Min xerror = .84375, associated xstd = .080050, associtated cp = .01
+
+```{r}
+#prune
+rpart.model_df.min <- prune(rpart.model_df, cp = 0.01)
+rpart.plot(rpart.model_df.min, extra = 2, digits = 3, main = 'Death Classification Tree')
+```
+```{r}
+#compare cross-validated full-set error with test set error
+set.seed(2)
+train_2 = sample(1:nrow(heart), size = 149)
+test_2 = heart[-train_2,]
+death.test = heart$death[-train_2]
+#rerun with apporpriate cp and train
+set.seed(2)
+rpart.train_2 = rpart(death ~ time + age + anaemia + creatinine_ph + diabetes + ejection_fraction + high_blood_pressure + platelets + creatinine_se + serum_sodium + sex + smoking,
+                       data = heart, subset = train_2, cp = 0.01)
+#prediction class type
+rpart.pred = predict(rpart.train_2, test_2, type = 'class')
+table(rpart.pred, death.test)
+#mean
+mean(rpart.pred!=death.test)
+```
+#bagged trees for importance
+```{r}
+#model 
+train = sample(1:nrow(model_df), nrow(model_df)/2)
+set.seed(9301)
+bag.model = randomForest(death ~ time + age + anaemia + creatinine_ph + diabetes + ejection_fraction + high_blood_pressure + platelets + creatinine_se + serum_sodium + sex + smoking , data = heart, subset = train, mtry =11, importance = TRUE)
+```
+```{r}
+bag.model
+```
+```{r}
+importance(bag.model)
+```
+
+
+
+
+
+
+
+
+
+
+
+

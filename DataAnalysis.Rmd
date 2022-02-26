@@ -1,0 +1,271 @@
+---
+title: "738 Analysis Proj."
+author: "Devin Rohler"
+date: "1/21/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Set up
+library(tidyverse)
+library(ggplot2)
+library(tidyr) 
+library(skimr)
+library(GGally)
+library(viridis)
+library(gridExtra)
+#read-in
+claims_df <- readRDS(url('https://gmubusinessanalytics.netlify.app/data/claims_df.rds'))
+```
+
+```{r}
+#explore dataset
+skim(claims_df)
+```
+
+
+#Question 1 : Does the amount of education of the driver change thier life time value on average? Do the lowest education drivers provide less value ?
+```{r}
+#summary 1
+claims_df %>% group_by(highest_education) %>%
+  summarise(n_drivers = n(),
+            average_value = mean(customer_lifetime_value),
+            max_value = max(customer_lifetime_value),
+            min_value = min(customer_lifetime_value)) %>%
+  arrange(desc(average_value))
+
+#figure 1
+ggplot(data = claims_df,aes(x=highest_education, y = customer_lifetime_value)) +
+  geom_boxplot(fill = "#006EA1") +
+  labs(title = 'Figure 1. Boxplot of Customer Value by Highest Education', x = 'Highest Education',
+       y = 'Customer Lifetime Value($)') +
+    theme_bw() +
+     theme(plot.title = element_text(size = 10, color = "blue"), 
+         axis.title.x = element_text(size = 10, color = "blue"),
+         axis.title.y = element_text(size = 10, color = "blue"))
+```
+#Looking at the summary table and box plot we can see that Master's provide the highest value on average ($1,154) for the company and Doctoral provide the lowest value on average ($777). The typical thinking that lower education drivers would be more prone to accidents and cost the company more does not hold from this summary. HighSchool drivers provide the 2nd highest value. 
+
+
+
+
+
+
+#Question 2: Which state has the highest amount of claims? Which state has the highest total dollar amount in claims?
+```{r}
+#figure 2
+ggplot(data = claims_df, aes(x=customer_state,y=total_claims)) +
+  geom_col(color = 'plum3') +
+  labs(title = "Figure 2. Total Count of Customer Claims by State", x = 'State',
+       y = 'Total Claims') +
+  theme_bw() +
+     theme(plot.title = element_text(size = 10, color = "darkred"), 
+         axis.title.x = element_text(size = 10, color = "darkred"),
+         axis.title.y = element_text(size = 10, color = "darkred"))
+#summary 2
+claims_df %>% group_by(customer_state) %>%
+  summarise(total_claims = sum(total_claims),
+            claim_cost = sum(total_claims_amount)) %>%
+  arrange(desc(claim_cost))
+```
+#Using the bar chart and the summary table we can see that California has the highest number of claims at 5185 and the highest dollar amount in claims at $5,966,288. Washington was the lowest number of claims at 1331 and the lowest dollar amount at $1,529,445
+
+
+
+
+
+
+
+
+#Question 3: Does vehicle type have an affect on profitability ?
+```{r}
+#summary 3
+claims_df %>% group_by(vehicle_class) %>%
+  summarise(n_drivers = n(),
+            average_value = mean(customer_lifetime_value),
+            max_value = max(customer_lifetime_value),
+            min_value = min(customer_lifetime_value)) %>%
+  arrange(desc(average_value))
+```
+#looking at the summary chart We can see that luxury Vehicles (SUV/Car) have the highest average customer value by a large amount at $6,381 and $5,669. This may be due to customers that spend large amounts of money on higher end vehicles are more likely to drive them carefully. Two door cars had the lowest average customer value at $269.
+
+
+
+
+
+
+
+
+
+#Question 4:  What effects do premiums have on customer value?
+```{r, fig.height=6, fig.width=10}
+#figure 4
+ggplot(data = claims_df,aes(x= customer_lifetime_value, y = monthly_premium)) +
+  geom_point(color = "deepskyblue3") +
+  geom_smooth(method = 'lm', color = 'red') +
+  labs(title = 'Figure 4. Scatter Plot of Customer lifetime Value in Accordance to Monthly Premium', x = 'Customer Lifetime Value ($)',
+       y = 'Cost of Monthly Premium ($)') +
+    theme_bw() +
+     theme(plot.title = element_text(size = 10, color = "darkred"), 
+         axis.title.x = element_text(size = 10, color = "darkred"),
+         axis.title.y = element_text(size = 10, color = "darkred"))
+#summary 4
+interval_premium <- claims_df %>% mutate(premium_interval = cut_interval(monthly_premium, n = 4))
+interval_premium %>% group_by(premium_interval,coverage) %>%
+  summarise(n_drivers = n(),
+            average_value = mean(customer_lifetime_value),
+            max_value = max(customer_lifetime_value),
+            min_value = min(customer_lifetime_value)) %>%
+  arrange(desc(average_value))
+```
+#looking at the scatter plot there seems to be a somewhat positive linear correlation between monthly premiums and customer value. The large majority of points are closer to the 0s of the X and Y axes. Using the regression line we can see that in most instances as the Monthly premium increases so does the lifetime value. This may be due to customers with more money may be more carfeul with driving because they own more luxury vehicles. We will look further into salaries.
+
+
+
+
+
+
+
+
+#Question 5: Can a relationship be seen between Months since policy active and thier related value & Number of claims?
+```{r}
+#figure 5 
+ggplot(data = claims_df,aes(x= months_policy_active, y = customer_lifetime_value, color = total_claims)) +
+  geom_point(fill = "#006EA1") +
+  geom_smooth(color = 'red') +
+  scale_color_gradientn(colours = viridis(8)) +
+  labs(title = "Figure 5. Relationship Between Customer Value and Thier Time With The Company",
+       x = 'Total Months Since Policy Acitivation', y = 'Customer Lifetime Value($)',
+       color = 'Total Claims') +
+    theme_bw() +
+     theme(plot.title = element_text(size = 10, color = "black"), 
+         axis.title.x = element_text(size = 10, color = "black"),
+         axis.title.y = element_text(size = 10, color = "black"))
+#summary 5 
+interval <- claims_df %>% mutate(months_interval = cut_interval(months_policy_active, n = 4))
+interval %>% group_by(months_interval) %>%
+  summarise(n_drivers = n(),
+            average_value = mean(customer_lifetime_value),
+            max_value = max(customer_lifetime_value),
+            min_value = min(customer_lifetime_value)) %>%
+  arrange(desc(average_value))
+```
+#Looking at the scatter plot we can see that as months since policy active increases so does cusomter lifetime value in most cases. No matter the amount of claims this seems to be the case. This is probably due to the more months the premium is paid the total value increases even if claims are still happening. Months active has a higher relationship than total claims in this instance. The the higher amount of claims seems to have lower value but all seem to be a positive path. Claims of 4 & 3 take about 40-50 months to start providing value. Looking at the dataframe we can see that months 12-26.8 provide a negative value at around $658 after those months value is positive on average
+
+
+
+
+
+
+
+
+#Question 6  Of the drivers who provied a negative lifetime value, which gender and coverage type provided the least amount of lifetime value
+```{r}
+#summary 6 
+negative <- claims_df %>% filter(customer_lifetime_value < 0)
+negative %>% group_by(gender,coverage) %>%
+  summarise(n_drivers = n(),
+            average_value = mean(customer_lifetime_value),
+            average_claims = mean(total_claims),
+            average_claims_cost = mean(total_claims_amount)) %>%
+  arrange(desc(average_value))
+```
+#Looking at the summary table we can get more insight into those customers who provide negative value. In each  coverage type males provide less value. Males may be more likely to drive cars recklessly. The more expensive the coverage is, the more value drivers provide.Basic coverage provided the least amount of value in both males and females, This is true with those who provide positive value as well.The less value a driver provides usually corelates to a higher claim amount and lower cost of coverage. 
+
+
+
+
+
+
+
+
+#Question 7  What are the counts of vehicle size in those who provided a positive value and negative ? Are there any differences ? How does this relate to value of customers ?
+```{r, fig.height= 8, fig.height= 8}
+positive <- claims_df %>% filter(customer_lifetime_value > 0)
+#Figure 6
+pvs <- ggplot(data = positive,aes(x = vehicle_size)) + 
+  geom_histogram(stat = 'count', fill = 'springgreen4', color = 'black') +
+  labs(title = 'figure 6: Count of Vehicle Size in Positive Valued Customers', x = 'Vehicle Size',
+       y = 'Count') +
+    theme_bw() +
+     theme(plot.title = element_text(size = 11, color = "darkred"), 
+         axis.title.x = element_text(size = 11, color = "darkred"),
+         axis.title.y = element_text(size = 11, color = "darkred"))
+#Figure 7
+nvs <- ggplot(data = negative,aes(x = vehicle_size)) +
+  geom_histogram(stat = 'count', fill = 'red4', color = 'black') +
+  labs(title = 'figure 7: Count of Vehicle Size in Negative Valued Customers', x = 'Vehicle Size',
+       y = 'Count') +
+    theme_bw() +
+     theme(plot.title = element_text(size = 11, color = "darkred"), 
+         axis.title.x = element_text(size = 11, color = "darkred"),
+         axis.title.y = element_text(size = 11, color = "darkred"))
+#grid arrange
+grid.arrange(pvs,nvs)
+
+#summary 7
+claims_df %>% group_by(vehicle_size) %>%
+  summarise(n_drivers = n(),
+            average_value = mean(customer_lifetime_value),
+            average_claims = mean(total_claims),
+            average_claims_cost = mean(total_claims_amount)) %>%
+  arrange(desc(average_value))
+```
+#In both subsets of customers Midsize had the highest count and Large had the lowest.Looking into the dataframe we can see that midsize provide the highest value and small provide the lowest. These average value are pretty similar so they do not have much effect on change in value. Midsize seems to provide a slightly larger average value because there are much more cusomters with Midsize vehicles.
+
+
+
+
+
+
+
+
+
+#Question 8: Does employement status affect customer value? 
+```{r}
+#Figure 8
+ggplot(data = claims_df,aes(x = employment_status, y = customer_lifetime_value)) +
+  geom_jitter(color = 'orange') +
+  labs(title = 'Figure 8. Customer Lifetime Value by Employment Status', x = 'Employment Type',
+       y = 'Customer Lifetime Value($)') +
+    theme_bw() +
+     theme(plot.title = element_text(size = 10, color = "darkred"), 
+         axis.title.x = element_text(size = 10, color = "darkred"),
+         axis.title.y = element_text(size = 10, color = "darkred"))
+#Summary
+claims_df %>% group_by(employment_status) %>%
+  summarise(n_drivers = n(),
+            average_value = mean(customer_lifetime_value),
+            average_claims = mean(total_claims),
+            average_claims_cost = mean(total_claims_amount)) %>%
+  arrange(desc(average_value))
+```
+#Looking at the graph and dataframe we can see that most of the drivers employed. however employed drivers provide the least average value at $898 while disabled driver provide the highest average value at $1,141
+
+ 
+
+
+
+
+
+
+
+
+#Summary of Results
+#	Often auto insurance companies are losing money due to their customers. Customers must pay a monthly premium to keep the benefits associated with said company. However, some customers get into accidents and rack up claim charges that are higher in cost than their associated value. Value is their total premiums – total claims cost. The goal of this analysis is to look deeper into which variables drive differences between customers who provide a large value and those who provide a negative value. It is important for this company and companies alike to be able to figure out what customers may be a risk for them to bring on. In the end like all businesses profit is the main motive. During this analysis key insights will be found for the company to be able to choose the right customers and prices to maximize total profit. This will be done through an in-depth data analysis, insight and recommendations.
+	
+#	Most variables in the dataset were used in some capacity for analysis, most are in relation to customer lifetime value. Some interesting insights were found through the association of these variables.  First, looking at summary 1 and figure 1, we can see that master’s degrees provide the highest value on average ($1,154) and doctoral was the lowest at ($777). This provides good insight, often the thinking is the lower educated a person is the more likely they are reckless or careless. This does not hold true in this example. Those with the lowest education (Highschool) provided the second highest value on average.  Next, we can see that vehicle type had a large affect on value. Luxury SUVs and Cars on average brought in ($6,381) and ($5,669) respectively. Which is $3,000 more than the next highest value of ($2,158) brought in by sports cars. Four-Door and Two-Door brought in the lowest amounts at ($271) and ($269).  The reason this may be is that the customers with higher end cars may be able to afford and want to have a better policy type, so their car is covered incase of accident. High end car owners may be more careful driving as well since they spent a lot more money on their cars.  Next, we can look at premiums. Premiums are paid monthly by the customers for service. Usually the higher the premium is, the better the coverage is. Looking at figure 4. There seems to be a positive linear correlation between premiums and customer value. Using the regression line, we can see that in most cases as monthly premiums increase so does the lifetime value. Next, looking at the time since the customer activated their policy. Looking at figure 5 And summary 5, we can see that as the time grows of the policy so does the customer value. Customers in the 12-26.8-month interval provide a negative value on average at around (-$658). In the 26.8-41.4, 41.5-56.2 and 56.2 - 71 all provide a positive average value at ($429, $1,742 and $3,109) respectively. Looking at figure 7 and summary 7 we can see that midsize cars provide a slightly larger value on average; this may be due to more customers have midsize cars than others. Lasty, we will look at customer employment status. We can see that most drivers are employed, however employed driver provide the least average value at $898 while disabled drivers provide the highest at $1,141. Overall, this data analysis provides good insight into this companies customers and their associated value.  Next some recommendations will be made to the company.
+
+#	There are many variables and incidents that the insurance company cannot predict. Sometimes accidents happen and it does not always corelate to a certain variable. However, there were a lot of trends in this data that show many variables are correlated.  My recommendations to this company are as followed. The first is that companies should try to find customers with higher end vehicles. The more expensive the car is the more likely the customer will be able to afford and want to spend a higher premium to protect their car. These customers provide more value for the company and may be more likely to drive carefully since they own an expensive and nice car. This is related to my second recommendation. Try to raise the prices of premiums, not a drastic amount but raise it some. It seems there is a direct positive linear correlation between customer value and the amount paid on premiums. Try to explain to the customers that paying a higher premium will provide them with more coverage and save them more money in the long run.  Next, I would recommend offering safe driving classes or a safe driver rewards bonus of some sort. Provide customers will an incentive to drive safe. With a good coverage plan customers may not be worried with paying out of pocket since the assume all costs will be covered by the company. Or implement a dramatic increase to monthly premium as total claims go up. This will also incentives them to drive safer and to get the safe driving bonus. Next, I would try to gain more female customers than males, in most coverage types of males provided the lesser amount of value. Male drivers may be more aggressive than females which accounts for more claims. The last and most important recommendation is customer retention. There is a strong correlation between months of the policy and customer value. In most instances as months of the policy increases so does the customer value. Try to make the customers feel wanted, check up on them frequently and provide the best customer service possible. If a person feels unwanted or was not treated well, they will be more likely to switch providers.  Keeping customers and teaching and then giving them incentives for safe driving will bring in more profits and give the company a higher reputation which will again bring in more customers.
+
+
+
+
+
+

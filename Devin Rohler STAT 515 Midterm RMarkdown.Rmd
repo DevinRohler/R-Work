@@ -1,0 +1,96 @@
+---
+title: "Untitled"
+author: "Devin Rohler"
+date: "9/27/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#load packages
+library(ggplot2)
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(gridExtra)
+library(lubridate)
+library(ggimage)
+library(viridis)
+library(ggpubr)
+```
+```{r}
+#Source
+source('C:/Users/Devin/Desktop/School Work/Graduate/Fall 2021/STAT 515/Week 5/hw_.R')
+```
+```{r}
+#Read-in
+tdf <- read.csv(file = 'C:/Users/Devin/Desktop/School Work/Graduate/Fall 2021/STAT 515/Midterm/tdf_stat.csv')
+```
+
+
+```{r}
+#Clean
+tdf_clean <- tdf[-c(13:16,38:44,120:175),]
+tdf_clean <- tdf_clean %>% rename('length' = 'Length.Kms.')
+```
+
+```{r}
+#New columns for analysis 
+tdf_clean$finishpercent = tdf_clean$finishers/tdf_clean$entrants
+tdf_clean$Year <- as.numeric(tdf_clean$Year)
+```
+
+
+```{r, fig.width=9}
+#figure 1
+ggplot(data = tdf_clean, aes(x = length, y = finishpercent)) +
+  geom_point(aes(col = winner_average_speed)) +
+  geom_smooth(method = "lm") +
+  ylim(0,1) +
+  xlim(2000,6000) +
+  scale_color_gradientn(colours = viridis(8)) +
+  labs(title = "Effect of Race Length on Percent of Finishers and Average Speed",
+       subtitle = "For Le Tour de France 1903-2021",
+       x = "Total Race Length in Kilometers",
+       y = "Percent of Finishers",
+       caption = '                      
+                    *No races were held from 1915-1918 & 1940-1946 due to WW1 & WW2',
+       color = "Winner Average Speed\nIn Kilometers Per Hour") +
+  theme(plot.caption = element_text(hjust = 0)) + hw
+```
+
+```{r, fig.width=9}
+#figure 2
+ggplot(data = tdf_clean, aes(x = Year, y = number_of_stages)) +
+  geom_point(aes(col = length)) +
+  scale_color_gradientn(colours = magma(8)) +
+  geom_smooth(method = "lm") + 
+  labs(title = "How has the Tour de France Changed Over the Years?",
+       subtitle = "For Le Tour de France 1903-2021",
+       x = "Year",
+       y = "Number of Stages",
+       caption = '                      
+                    *No races were held from 1915-1918 & 1940-1946 due to WW1 & WW2',
+       color = "Total Race Length\nIn Kilometers") + hw
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

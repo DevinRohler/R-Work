@@ -1,0 +1,465 @@
+---
+title: "AIT Final"
+author: "Devin Rohler"
+date: "11/5/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#source file for aesthetics 
+setwd("/Users/Devin/Desktop/School Work/Graduate/Fall 2021/AIT 580/Project")
+```
+
+```{r}
+# Read in and display the data file 
+crime <- read.csv('c:/Users/Devin/Desktop/School Work/Graduate/Fall 2021/AIT 580/Project/NYC_CRIME_2014.csv', header=TRUE, sep = ',')
+```
+
+```{r}
+#packages
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+library(stringr)
+library(ggridges)
+```
+
+
+
+Data Manipulation for Processing and Exploratory Analysis
+```{r}
+#Rename
+crime <- crime %>% rename(date = ï..DATE, time = TIME.OCC, area_num = AREA, area_name = AREA.NAME, sub_area_num = Rpt.Dist.No,
+                 crime_code = Crm.Cd, crime_description = Crm.Cd.Desc, vic_age = Vict.Age, vic_sex = Vict.Sex, vic_descent = Vict.Descent, structure_code = Premis.Cd,
+                 structure_description = Premis.Desc, weapon_code = Weapon.Used.Cd, weapon_description = Weapon.Desc)
+```
+```{r}
+#string manipulation for date variable, cut off end, and split into 3 different variables 
+#remove parenthesis
+type <- str_split_fixed(crime$crime_description,'[()]',2)
+type <- data.frame(type)
+type <- subset(type, select = c(X1))
+type <- type %>%  rename(crime_type = X1)
+
+#remove parenthesis
+structure <- str_split_fixed(crime$structure_description,'[()]',2)
+structure <- data.frame(structure)
+structure <- subset(structure, select = c(X1))
+structure <- structure %>% rename(premis = X1)
+
+#remove parenthesis 
+weapon <- str_split_fixed(crime$weapon_description,'[()]',2)
+weapon <- data.frame(weapon)
+weapon <- subset(weapon, select = c(X1))
+weapon <- weapon %>% rename(weapon_type = X1)
+
+#remove parenthesis 
+crime_split <- str_split_fixed(crime$date,' ',2)
+crime_split <- data.frame(crime_split)
+
+#remove parenthesis
+crime_n <- str_split_fixed(crime_split$X1,'/',3)
+crime_n <- data.frame(crime_n)
+crime_n <- crime_n %>% rename(month = X1, day = X2, year = X3)
+
+crime_1 <- subset(crime, select = -c(date))
+#combine str manipulated variables
+crime <- cbind(type,structure,weapon,crime_n,crime_1)
+#drop codes, have type variable as well, code is not needed
+crime <- subset(crime, select = -c(area_num,crime_description,structure_description,weapon_description))
+```
+```{r}
+#recode variables
+crime$vic_sex = factor(crime$vic_sex,
+                   levels = c('M','F','X'),
+                   labels = c("Male","Female","Unknown"))
+crime$vic_descent = factor(crime$vic_descent,
+                   levels = c('A','B','C','D','F','G','H','I','J'
+                              ,'K','L','O','P','S','U','V','W','X','Z'),
+                   labels = c('Other Asian','Black','Chinese','Cambodian',
+                              'Filipino','Guamanian','Hispanic','American Inidan',
+                              'Japanese','Korean','Laotian','Other','Pacific Islander',
+                              'Samoan','Hawaiian','Vietnamese','White',
+                              'Unknown','Asian Indian'))
+
+crime$month <- factor(crime$month, levels = c("1","2","3","4","5","6","7","8","9","10",
+                                              "11","12"),
+                      labels = c("Jan","Fed","Mar","Apr",
+                      "May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))
+```
+
+
+
+Exploratory Analysis 
+
+```{r}
+#Crime Count/Month
+crime %>% group_by(month) %>% 
+  summarise(n_crimes = n()) %>% 
+  arrange(desc(n_crimes))
+```
+```{r, fig.height= 7, fig.width= 9}
+#Crime Count Time Line
+ggplot(crime,aes(x = month)) + 
+  geom_bar(fill = '#CC6600', color =  'black') +
+  labs(title = "Number of Crimes Per Month for L.A.",
+       subtitle = "For the Year 2014",
+       x = "Month",
+       y = "# of Crimes")
+```
+
+
+
+
+```{r}
+#crime types
+crime %>% group_by(crime_type) %>% 
+  summarise(n_crimes = n()) %>% 
+  arrange(desc(n_crimes), n = 10)
+```
+```{r}
+#crime weapon
+crime %>% group_by(weapon_type) %>% 
+  summarise(weapon_count = n()) %>% 
+  arrange(desc(weapon_count))
+```
+```{r}
+#crime premis
+crime %>% group_by(premis) %>% 
+  summarise(location_count = n()) %>% 
+  arrange(desc(location_count))
+```
+```{r}
+#crime location
+crime %>% group_by(area_name) %>% 
+  summarise(area_count = n()) %>% 
+  arrange(desc(area_count))
+```
+```{r}
+#victum descent
+crime %>% group_by(vic_descent) %>% 
+  summarise(vic_descent_count = n()) %>% 
+  arrange(desc(vic_descent_count))
+```
+```{r}
+#victum sex
+crime %>% group_by(vic_sex) %>% 
+  summarise(vic_sex_count = n()) %>% 
+  arrange(desc(vic_sex_count))
+```
+```{r}
+#Average Number of Crimes/Day in 2014
+crime %>% group_by(year) %>%
+  summarise(crime_count = n()/365)
+```
+
+
+
+Research Questions 
+ 1. What impact do major holidays have on the number of crimes in L.A.?
+```{r}
+#Fourth of July Crime Types
+fourth <- filter(crime, month == 'Jul' & day == 4)
+fourth %>% group_by(crime_type) %>%
+  summarize(crime_4th_count = n()) %>% 
+  arrange(desc(crime_4th_count))
+```
+```{r}
+#Total on 4th
+fourth %>% group_by(day) %>% 
+  summarize(total_4th = n())
+```
+
+
+```{r}
+#Thanksgiving Crime Types
+thanks <- filter(crime, month == 'Nov' & day == 27)
+thanks%>% group_by(crime_type) %>%
+  summarize(crime_thanks_count = n()) %>% 
+  arrange(desc(crime_thanks_count))
+```
+```{r}
+#Total on Thanksgiving
+thanks %>% group_by(day) %>% 
+  summarize(total_thanks = n())
+```
+
+
+```{r}
+#Christmas Crime Types
+xmas <- filter(crime, month == 'Dec' & day == 25)
+xmas %>% group_by(crime_type) %>%
+  summarize(crime_xmas_count = n()) %>% 
+  arrange(desc(crime_xmas_count))
+```
+```{r}
+#Total on Christmas
+xmas %>% group_by(day) %>% 
+  summarize(total_xmas = n())
+```
+
+
+```{r}
+#New Years Crime Types
+new <- filter(crime, month == 'Jan' & day == 1)
+new %>% group_by(crime_type) %>%
+  summarize(crime_new_count = n()) %>% 
+  arrange(desc(crime_new_count))
+```
+```{r}
+#Total on New Years
+new %>% group_by(day) %>% 
+  summarize(total_new = n())
+```
+
+
+
+2. How does the percent of victums by gender and race change during these Holidays, in L.A.?
+
+This questions will be analyzed by showing statistics of gender,race and both and then comparing it to the yearly average
+
+#Fourth of July
+```{r}
+#Fourth, sex
+fourth %>% group_by(vic_sex) %>%
+  summarize(fourth_2_count =n()) %>%
+  arrange(desc(fourth_2_count))
+```
+```{r}
+#Fourth, race
+fourth %>% group_by(vic_descent) %>%
+  summarize(fourth_2_count =n()) %>%
+  arrange(desc(fourth_2_count))
+```
+```{r}
+#Fourth, both
+fourth %>% group_by(vic_sex,vic_descent) %>%
+  summarize(fourth_2_count =n()) %>%
+  arrange(desc(fourth_2_count))
+```
+```{r}
+#Fourth, both
+fourth %>% group_by(vic_sex,vic_descent,crime_type) %>%
+  summarize(fourth_2_count =n()) %>%
+  arrange(desc(fourth_2_count))
+```
+
+```{r, fig.height= 7, fig.width= 9}
+#Fourth Plot
+ggplot(fourth,aes(x = vic_descent, fill = vic_sex)) + 
+  geom_bar(color =  'black') +
+  labs(title = "Number of Crimes Per Race & Gender for L.A.",
+       subtitle = "For July 4th, 2014",
+       x = "Victim Race",
+       y = "# of Crimes") +
+  guides(fill=guide_legend(title = "Victim Sex"))
+```
+
+
+#Thanksgiving
+```{r}
+#Thanksgiving, sex
+thanks %>% group_by(vic_sex) %>%
+  summarize(thanks_2_count =n()) %>%
+  arrange(desc(thanks_2_count))
+```
+```{r}
+#Thanksgiving, race
+thanks %>% group_by(vic_descent) %>%
+  summarize(thanks_2_count =n()) %>%
+  arrange(desc(thanks_2_count))
+```
+```{r}
+#Thanksgiving, both
+thanks %>% group_by(vic_descent,vic_sex) %>%
+  summarize(thanks_2_count =n()) %>%
+  arrange(desc(thanks_2_count))
+```
+```{r}
+#Thanksgiving, both
+thanks %>% group_by(vic_descent,vic_sex,crime_type) %>%
+  summarize(thanks_2_count =n()) %>%
+  arrange(desc(thanks_2_count))
+```
+```{r, fig.height= 7, fig.width= 9}
+#Thanksgiving Plot
+ggplot(thanks,aes(x = vic_descent, fill = vic_sex)) + 
+  geom_bar(color =  'black') +
+  labs(title = "Number of Crimes Per Race & Gender for L.A.",
+       subtitle = "For Thanksgiving 2014",
+       x = "Victim Race",
+       y = "# of Crimes") +
+    guides(fill=guide_legend(title = "Victim Sex"))
+```
+
+
+
+#Christmas
+```{r}
+#Christmas, sex
+xmas %>% group_by(vic_sex) %>%
+  summarize(xmas_2_count =n()) %>%
+  arrange(desc(xmas_2_count))
+```
+```{r}
+#Christmas, race
+xmas %>% group_by(vic_descent) %>%
+  summarize(xmas_2_count =n()) %>%
+  arrange(desc(xmas_2_count))
+```
+```{r}
+#Christmas
+xmas %>% group_by(vic_descent,vic_sex) %>%
+  summarize(xmas_2_count =n()) %>%
+  arrange(desc(xmas_2_count))
+
+```
+```{r}
+#Christmas
+xmas %>% group_by(vic_descent,vic_sex,crime_type) %>%
+  summarize(xmas_2_count =n()) %>%
+  arrange(desc(xmas_2_count))
+```
+```{r, fig.height= 7, fig.width= 9}
+#Christmas Plot Plot
+ggplot(xmas,aes(x = vic_descent, fill = vic_sex)) + 
+  geom_bar(color =  'black') +
+  labs(title = "Number of Crimes Per Race & Gender for L.A.",
+       subtitle = "For Christmas 2014",
+       x = "Victim Race",
+       y = "# of Crimes") +
+    guides(fill=guide_legend(title = "Victim Sex"))
+```
+
+
+#New Years
+```{r}
+#New Years, sex
+new %>% group_by(vic_sex) %>%
+  summarize(thanks_2_count =n()) %>%
+  arrange(desc(thanks_2_count))
+```
+```{r}
+#New Years, race
+new %>% group_by(vic_descent) %>%
+  summarize(thanks_2_count =n()) %>%
+  arrange(desc(thanks_2_count))
+```
+```{r}
+#New Years, both
+new %>% group_by(vic_descent,vic_sex) %>%
+  summarize(new_2_count =n()) %>%
+  arrange(desc(new_2_count))
+```
+```{r}
+#New Years, both
+new %>% group_by(vic_descent,vic_sex,crime_type) %>%
+  summarize(new_2_count =n()) %>%
+  arrange(desc(new_2_count))
+```
+```{r, fig.height= 7, fig.width= 9}
+#New years Plot
+ggplot(new,aes(x = vic_descent, fill = vic_sex)) + 
+  geom_bar(color =  'black') +
+  labs(title = "Number of Crimes Per Race % Gender for L.A.",
+       subtitle = "For New Years 2014",
+       x = "Victim Race",
+       y = "# of Crimes") + 
+      guides(fill=guide_legend(title = "Victim Sex"))
+```
+
+
+#Yearly Average to compare
+```{r}
+#Yearly Average Crime Per Victim Sex
+crime %>% group_by(vic_sex) %>%
+  summarize(average_sex_count =n()/365) %>%
+  arrange(desc(average_sex_count))
+```
+```{r}
+#Yearly Average Crime Per Victim Race
+crime %>% group_by(vic_descent) %>%
+  summarize(average_race_count =n()/365) %>%
+  arrange(desc(average_race_count))
+```
+```{r}
+#Yearly Average Crime Per Victim sex and race combined
+crime %>% group_by(vic_sex,vic_descent) %>%
+  summarize(average_race_count =n()/365) %>%
+  arrange(desc(average_race_count))
+```
+
+
+
+
+3. How do the crime rates change for areas of L.A. during these holidays?
+```{r}
+#Fourth
+fourth %>% group_by(area_name) %>%
+  summarize(fourth_3_count =n()) %>%
+  arrange(desc(fourth_3_count))
+```
+```{r}
+#Thanksgiving 
+thanks %>% group_by(area_name) %>%
+  summarize(thanks_3_count =n()) %>%
+  arrange(desc(thanks_3_count))
+```
+```{r}
+#Thanksgiving 
+xmas %>% group_by(area_name) %>%
+  summarize(xmas_3_count =n()) %>%
+  arrange(desc(xmas_3_count))
+```
+```{r}
+#New Years
+new %>% group_by(area_name) %>%
+  summarize(new_3_count =n()) %>%
+  arrange(desc(new_3_count))
+```
+
+
+#Yearly Average for location
+```{r}
+#Average Number of Crimes/Location for LA, 2014
+crime %>% group_by(area_name) %>% 
+  summarise(area_count = n()/365) %>% 
+  arrange(desc(area_count))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
